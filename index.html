@@ -90,8 +90,18 @@
     const initials = s => (s||'AA').split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase();
     const titleMap={overview:'Overview',portfolio:'Portfolio',transactions:'Transaction Ledger',dividends:'Dividend Ledger',investors:'Investor Relations',distributions:'Profit Sharing',documents:'Documents & Reports',profile:'My Account'};
     function renderAuth(message='',error=false){
-      root.innerHTML=`<div class="auth-shell"><div class="auth-card"><div class="brand-row"><div class="brand-mark">AAI</div><div><div class="eyebrow">PRIVATE INVESTMENT OFFICE</div><div style="font:700 12px Manrope;margin-top:4px">PT. Adhinatha Amanah Investama</div></div></div><h1>${authMode==='login'?'Welcome back.':authMode==='signup'?'Create access.':'Reset password.'}</h1><p>${authMode==='login'?'Masuk ke portal investasi Anda.':authMode==='signup'?'Pendaftaran akun pertama untuk menyiapkan akses admin. Akun baru akan menunggu aktivasi perusahaan.':'Masukkan email untuk menerima tautan reset password.'}</p>${message?`<div class="notice ${error?'error':''}">${esc(message)}</div>`:''}
-      ${authMode==='reset'?`<form id="auth-form"><div class="field"><label>Email perusahaan</label><input name="email" type="email" required autocomplete="email" placeholder="nama@email.com"></div><button class="btn full" type="submit">Kirim tautan reset</button></form><div class="auth-foot"><button class="link-btn" data-auth="login">Kembali ke login</button></div>`:`<form id="auth-form">${authMode==='signup'?`<div class="field"><label>Nama lengkap</label><input name="full_name" required autocomplete="name" placeholder="Nama lengkap"></div>`:''}<div class="field"><label>Email</label><input name="email" type="email" required autocomplete="email" placeholder="nama@email.com"></div><div class="field"><label>Password</label><input name="password" type="password" required minlength="8" autocomplete="${authMode==='login'?'current-password':'new-password'}" placeholder="Minimal 8 karakter"></div><button class="btn full" type="submit">${authMode==='login'?'Masuk ke dashboard':'Daftar akun'}</button></form><div class="auth-foot">${authMode==='login'?`<button class="link-btn" data-auth="reset">Lupa password?</button><button class="link-btn" data-auth="signup">Aktivasi admin pertama</button>`:`<button class="link-btn" data-auth="login">Sudah punya akun? Login</button><span>AAI Secure Portal</span>`}</div>`}</div></div>`;
+      const recovery=authMode==='update-password';
+      const heading=authMode==='login'?'Welcome back.':authMode==='signup'?'Create access.':recovery?'Buat password baru.':'Reset password.';
+      const intro=authMode==='login'?'Masuk ke portal investasi Anda.':authMode==='signup'?'Pendaftaran akun pertama untuk menyiapkan akses admin. Akun baru akan menunggu aktivasi perusahaan.':recovery?'Tautan reset telah diverifikasi. Buat password baru untuk akun Anda.':'Masukkan email untuk menerima tautan reset password.';
+      let form='';
+      if(recovery){
+        form='<form id="auth-form"><div class="field"><label>Password baru</label><input name="password" type="password" required minlength="8" autocomplete="new-password" placeholder="Minimal 8 karakter"></div><div class="field"><label>Ulangi password baru</label><input name="password_confirm" type="password" required minlength="8" autocomplete="new-password" placeholder="Ulangi password"></div><button class="btn full" type="submit">Simpan password baru</button></form>';
+      }else if(authMode==='reset'){
+        form='<form id="auth-form"><div class="field"><label>Email perusahaan</label><input name="email" type="email" required autocomplete="email" placeholder="nama@email.com"></div><button class="btn full" type="submit">Kirim tautan reset</button></form><div class="auth-foot"><button class="link-btn" data-auth="login">Kembali ke login</button></div>';
+      }else{
+        form='<form id="auth-form">'+(authMode==='signup'?'<div class="field"><label>Nama lengkap</label><input name="full_name" required autocomplete="name" placeholder="Nama lengkap"></div>':'')+'<div class="field"><label>Email</label><input name="email" type="email" required autocomplete="email" placeholder="nama@email.com"></div><div class="field"><label>Password</label><input name="password" type="password" required minlength="8" autocomplete="'+(authMode==='login'?'current-password':'new-password')+'" placeholder="Minimal 8 karakter"></div><button class="btn full" type="submit">'+(authMode==='login'?'Masuk ke dashboard':'Daftar akun')+'</button></form><div class="auth-foot">'+(authMode==='login'?'<button class="link-btn" data-auth="reset">Lupa password?</button><button class="link-btn" data-auth="signup">Aktivasi admin pertama</button>':'<button class="link-btn" data-auth="login">Sudah punya akun? Login</button><span>AAI Secure Portal</span>')+'</div>';
+      }
+      root.innerHTML='<div class="auth-shell"><div class="auth-card"><div class="brand-row"><div class="brand-mark">AAI</div><div><div class="eyebrow">PRIVATE INVESTMENT OFFICE</div><div style="font:700 12px Manrope;margin-top:4px">PT. Adhinatha Amanah Investama</div></div></div><h1>'+heading+'</h1><p>'+intro+'</p>'+(message?'<div class="notice '+(error?'error':'')+'">'+esc(message)+'</div>':'')+form+'</div></div>';
       root.querySelectorAll('[data-auth]').forEach(b=>b.addEventListener('click',()=>{authMode=b.dataset.auth;renderAuth()}));
       root.querySelector('#auth-form').addEventListener('submit',handleAuthSubmit);
     }
@@ -99,7 +109,13 @@
       e.preventDefault(); if(busy)return; busy=true; const btn=e.currentTarget.querySelector('button[type=submit]');btn.disabled=true;
       const fd=new FormData(e.currentTarget); const email=String(fd.get('email')||'').trim().toLowerCase();
       try{
-        if(authMode==='login'){
+        if(authMode==='update-password'){
+          const password=String(fd.get('password')||''),confirmation=String(fd.get('password_confirm')||'');
+          if(password.length<8)throw new Error('Password minimal 8 karakter.');
+          if(password!==confirmation)throw new Error('Konfirmasi password tidak sama.');
+          const {error}=await supabase.auth.updateUser({password});if(error)throw error;
+          await supabase.auth.signOut();currentUser=null;profile=null;history.replaceState(null,'',location.pathname+location.search);authMode='login';renderAuth('Password berhasil diperbarui. Silakan login menggunakan password baru.');
+        }else if(authMode==='login'){
           const {error}=await supabase.auth.signInWithPassword({email,password:fd.get('password')}); if(error)throw error; await refreshApp();
         }else if(authMode==='signup'){
           const {data:res,error}=await supabase.auth.signUp({email,password:fd.get('password'),options:{data:{full_name:fd.get('full_name')}}});if(error)throw error;
@@ -284,8 +300,10 @@
     async function toggleInvestorStatus(id,next){try{const {error}=await supabase.from('profiles').update({status:next}).eq('id',id);if(error)throw error;notify('Status investor diperbarui.');await loadData();renderApp()}catch(e){notify(e.message,true)}}
     async function updateDistributionStatus(id,next){try{const {error}=await supabase.from('profit_distributions').update({status:next}).eq('id',id);if(error)throw error;if(next==='paid'){const {error:e2}=await supabase.from('profit_allocations').update({payment_status:'paid',paid_at:new Date().toISOString()}).eq('distribution_id',id);if(e2)throw e2;}notify('Status distribusi diperbarui.');await loadData();renderApp()}catch(e){notify(e.message,true)}}
     async function downloadDocument(id){const doc=data.documents.find(d=>d.id===id);if(!doc)return;const {data:out,error}=await supabase.storage.from('investor-documents').createSignedUrl(doc.storage_path,60);if(error){notify(error.message,true);return;}window.open(out.signedUrl,'_blank','noopener,noreferrer')}
-    supabase.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_OUT'){currentUser=null;profile=null;renderAuth()}else if(event==='PASSWORD_RECOVERY'){authMode='reset';renderAuth('Masukkan email untuk melanjutkan reset password.')}});
-    try{await refreshApp()}catch(e){renderAuth(e.message||'Aplikasi gagal terhubung ke Supabase.',true)}
+    supabase.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_OUT'){currentUser=null;profile=null;if(authMode!=='login')authMode='login';renderAuth()}else if(event==='PASSWORD_RECOVERY'){authMode='update-password';currentUser=session?.user||null;renderAuth('Tautan reset berhasil diverifikasi. Silakan buat password baru.')}});
+    const recoveryLink=new URLSearchParams(location.hash.replace(/^#/,'')).get('type')==='recovery';
+    if(recoveryLink){authMode='update-password';renderAuth('Tautan reset terdeteksi. Silakan buat password baru.')}
+    else{try{await refreshApp()}catch(e){renderAuth(e.message||'Aplikasi gagal terhubung ke Supabase.',true)}}
   </script>
 </body>
 </html>
