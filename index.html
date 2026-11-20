@@ -261,6 +261,12 @@
       modalRoot.innerHTML=`<div class="modal-backdrop"><div class="modal"><h3>${c.title}</h3><p>${c.desc}</p><form id="modal-form"><div class="form-grid">${c.body}</div><div class="modal-actions"><button type="button" class="btn ghost" id="cancel-modal">Batal</button><button type="submit" class="btn">Simpan</button></div></form></div></div>`;
       modalRoot.querySelector('#cancel-modal').onclick=()=>modalRoot.innerHTML='';
       modalRoot.querySelector('.modal-backdrop').addEventListener('click',e=>{if(e.target===e.currentTarget)modalRoot.innerHTML=''});
+      if(type==='transaction'){
+        const market=modalRoot.querySelector('[name="market"]'),currency=modalRoot.querySelector('[name="currency"]'),fx=modalRoot.querySelector('[name="fx_to_idr"]');
+        const currencyField=currency.closest('.field'),fxField=fx.closest('.field');
+        const syncMarketFields=()=>{const idx=market.value==='IDX';currencyField.style.display=idx?'none':'';fxField.style.display=idx?'none':'';if(idx){currency.value='IDR';fx.value='1';}};
+        market.addEventListener('change',syncMarketFields);syncMarketFields();
+      }
       modalRoot.querySelector('#modal-form').addEventListener('submit',e=>submitModal(e,type));
     }
     async function submitModal(e,type){
@@ -280,7 +286,7 @@
           const payload={investor_id:v.investor_id||null,market:v.market,symbol:v.symbol.toUpperCase().trim(),asset_name:v.asset_name||null,quantity:Number(v.quantity),average_cost:Number(v.average_cost),market_price:Number(v.market_price),currency:v.currency,fx_to_idr:Number(v.fx_to_idr),valuation_date:v.valuation_date||new Date().toISOString().slice(0,10),created_by:currentUser.id,updated_at:new Date().toISOString()};
           const {error}=await supabase.from('portfolio_positions').upsert(payload,{onConflict:'investor_id,market,symbol'});if(error)throw error;notify('Posisi portofolio berhasil disimpan.');
         }else if(type==='transaction'){
-          const payload={investor_id:v.investor_id||null,market:v.market,symbol:v.symbol.toUpperCase().trim(),asset_name:v.asset_name||null,side:v.side,quantity:Number(v.quantity),unit_price:Number(v.unit_price),currency:v.currency,fx_to_idr:Number(v.fx_to_idr),broker_fee_idr:Number(v.broker_fee_idr||0),realized_pnl_idr:Number(v.realized_pnl_idr||0),trade_date:v.trade_date,notes:v.notes||null,created_by:currentUser.id};
+          const isIdx=v.market==='IDX';const payload={investor_id:v.investor_id||null,market:v.market,symbol:v.symbol.toUpperCase().trim(),asset_name:v.asset_name||null,side:v.side,quantity:Number(v.quantity),unit_price:Number(v.unit_price),currency:isIdx?'IDR':v.currency,fx_to_idr:isIdx?1:Number(v.fx_to_idr),broker_fee_idr:Number(v.broker_fee_idr||0),realized_pnl_idr:Number(v.realized_pnl_idr||0),trade_date:v.trade_date,notes:v.notes||null,created_by:currentUser.id};
           const {error}=await supabase.from('portfolio_transactions').insert(payload);if(error)throw error;notify('Transaksi berhasil dicatat.');
         }else if(type==='distribution'){
           const {data:out,error}=await supabase.functions.invoke('aai-admin',{body:{action:'create-distribution',period_start:v.period_start,period_end:v.period_end,realized_profit_idr:Number(v.realized_profit_idr),broker_fees_idr:Number(v.broker_fees_idr),notes:v.notes||''}});if(error)throw error;if(out?.error)throw new Error(out.error);notify(`Distribusi draft dibuat dengan ${out.allocation_count} alokasi investor.`);
