@@ -133,7 +133,7 @@
     }
     async function loadData(){
       const queries=[
-        supabase.from('portfolio_positions').select('*').order('market').order('symbol'),
+        supabase.from('portfolio_positions_derived').select('*').order('market').order('symbol'),
         supabase.from('portfolio_transactions').select('*').order('trade_date',{ascending:false}).limit(250),
         supabase.from('investor_capital_movements').select('*').order('movement_date',{ascending:false}).limit(250),
         supabase.from('profit_allocations').select('*').order('created_at',{ascending:false}).limit(100),
@@ -149,13 +149,15 @@
     function totals(){
       const activeInvestors=(data.investors||[]).filter(p=>p.role==='investor'&&p.status==='active');
       const capital=(data.capital||[]).reduce((s,r)=>s+(r.movement_type==='deposit'?1:-1)*Number(r.amount_idr),0);
-      const value=(data.positions||[]).reduce((s,p)=>s+Number(p.quantity)*Number(p.market_price)*Number(p.fx_to_idr),0);
-      const cost=(data.positions||[]).reduce((s,p)=>s+Number(p.quantity)*Number(p.average_cost)*Number(p.fx_to_idr),0);
+      const pricedPositions=(data.positions||[]).filter(p=>p.market_price!==null&&p.market_price!==undefined&&Number(p.market_price)>0);
+      const unpricedCount=(data.positions||[]).length-pricedPositions.length;
+      const value=pricedPositions.reduce((s,p)=>s+Number(p.quantity)*Number(p.market_price)*Number(p.fx_to_idr),0);
+      const cost=pricedPositions.reduce((s,p)=>s+Number(p.quantity)*Number(p.average_cost)*Number(p.fx_to_idr),0);
       const unrealized=value-cost;
       const realized=(data.transactions||[]).reduce((s,t)=>s+Number(t.realized_pnl_idr||0),0);
       const fees=(data.transactions||[]).reduce((s,t)=>s+Number(t.broker_fee_idr||0),0);
       const allocated=(data.allocations||[]).reduce((s,a)=>s+Number(a.amount_idr||0),0);
-      return {capital,value,unrealized,realized,fees,allocated,activeInvestors};
+      return {capital,value,unrealized,realized,fees,allocated,activeInvestors,pricedCount:pricedPositions.length,unpricedCount};
     }
     const metric=(label,value,foot,icon='◈',tone='')=>`<div class="metric"><div class="metric-top"><span>${label}</span><span class="metric-icon">${icon}</span></div><div class="metric-value ${tone}">${value}</div><div class="metric-foot">${foot}</div></div>`;
     function chartSvg(){
@@ -165,21 +167,21 @@
       return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><defs><linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9a66b" stop-opacity=".25"/><stop offset="1" stop-color="#c9a66b" stop-opacity="0"/></linearGradient></defs>${[.25,.5,.75].map(y=>`<line x1="${L}" y1="${T+(H-T-B)*y}" x2="${W-R}" y2="${T+(H-T-B)*y}" class="chart-grid"/>`).join('')}<polygon points="${area}" class="chart-area-fill"/><polyline points="${pts}" class="chart-line"/>${labels}</svg>`;
     }
     function allocBreakdown(){
-      const v=[{key:'IDX',name:'Saham Indonesia',color:'#c9a66b'},{key:'US',name:'Saham Amerika',color:'#82b8e6'},{key:'CRYPTO',name:'Aset Kripto',color:'#a99ae8'}];const total=data.positions.reduce((s,p)=>s+Number(p.quantity)*Number(p.market_price)*Number(p.fx_to_idr),0);
-      if(total<=0)return `<div class="table-empty">Belum ada alokasi aset.<br>Tambahkan posisi portofolio pertama.</div>`;
-      return `<div class="alloc-list">${v.map(x=>{const amount=data.positions.filter(p=>p.market===x.key).reduce((s,p)=>s+Number(p.quantity)*Number(p.market_price)*Number(p.fx_to_idr),0),pct=amount/total*100;return `<div class="alloc-row"><div class="alloc-name"><span class="legend-dot" style="background:${x.color}"></span>${x.name}</div><div class="alloc-val">${pct.toFixed(1)}%</div><div class="track"><span style="width:${pct}%;background:${x.color}"></span></div></div>`}).join('')}</div>`;
+      const v=[{key:'IDX',name:'Saham Indonesia',color:'#c9a66b'},{key:'US',name:'Saham Amerika',color:'#82b8e6'},{key:'CRYPTO',name:'Aset Kripto',color:'#a99ae8'}];const priced=(data.positions||[]).filter(p=>p.market_price!==null&&p.market_price!==undefined&&Number(p.market_price)>0);const total=priced.reduce((s,p)=>s+Number(p.quantity)*Number(p.market_price)*Number(p.fx_to_idr),0);
+      if(total<=0)return `<div class="table-empty">Alokasi berdasarkan nilai pasar belum tersedia karena harga pasar posisi belum diisi.</div>`;
+      return `<div class="alloc-list">${v.map(x=>{const amount=priced.filter(p=>p.market===x.key).reduce((s,p)=>s+Number(p.quantity)*Number(p.market_price)*Number(p.fx_to_idr),0),pct=amount/total*100;return `<div class="alloc-row"><div class="alloc-name"><span class="legend-dot" style="background:${x.color}"></span>${x.name}</div><div class="alloc-val">${pct.toFixed(1)}%</div><div class="track"><span style="width:${pct}%;background:${x.color}"></span></div></div>`}).join('')}</div>`;
     }
     function overviewPage(){
       const t=totals(), net=t.realized-t.fees, myPending=data.allocations.filter(a=>a.payment_status!=='paid').reduce((s,a)=>s+Number(a.amount_idr),0), admin=isAdmin();
       const metrics=admin?[
-        metric('Total Nilai Portofolio',t.value?money(t.value):'—',`${data.positions.length} posisi tercatat`,'◈'),
+        metric('Total Nilai Portofolio',t.pricedCount?money(t.value):'—',`${data.positions.length} posisi · ${t.unpricedCount} belum ada harga`,'◈'),
         metric('Total Modal Bersih',t.capital?money(t.capital):'—','Akumulasi setoran dikurangi penarikan','↗'),
-        metric('Unrealized P/L',t.unrealized?money(t.unrealized):'—','Berdasarkan harga valuasi terakhir','⌁',t.unrealized>=0?'positive':'negative'),
+        metric('Unrealized P/L',t.pricedCount?money(t.unrealized):'—',t.pricedCount?`${t.pricedCount} posisi memiliki harga pasar`:'Menunggu harga pasar','⌁',t.unrealized>=0?'positive':'negative'),
         metric('Net Realized P/L',net?money(net):'—',`Broker fee ${money(t.fees)}`,'◉',net>=0?'positive':'negative')
       ].join(''):[
         metric('Modal Bersih Saya',t.capital?money(t.capital):'—','Setoran dikurangi penarikan','◈'),
-        metric('Nilai Portofolio',t.value?money(t.value):'—',`${data.positions.length} posisi tercatat`,'↗'),
-        metric('Unrealized P/L',t.unrealized?money(t.unrealized):'—','Estimasi berdasarkan harga terakhir','⌁',t.unrealized>=0?'positive':'negative'),
+        metric('Nilai Portofolio',t.pricedCount?money(t.value):'—',`${data.positions.length} posisi · ${t.unpricedCount} belum ada harga`,'↗'),
+        metric('Unrealized P/L',t.pricedCount?money(t.unrealized):'—',t.pricedCount?`${t.pricedCount} posisi memiliki harga pasar`:'Menunggu harga pasar','⌁',t.unrealized>=0?'positive':'negative'),
         metric('Bagi Hasil Belum Dibayar',myPending?money(myPending):'—','Sesuai alokasi yang diterbitkan','◉')
       ].join('');
       const recent=(data.transactions||[]).slice(0,6);
@@ -191,7 +193,7 @@
     }
     const marketTag=m=>`<span class="tag ${m==='IDX'?'idx':m==='US'?'us':'crypto'}">${m==='IDX'?'BEI':m==='US'?'US STOCK':'CRYPTO'}</span>`;
     function portfolioPage(){
-      return `<div class="page-head"><div><h2>Portfolio Positions</h2><p>Kelola posisi saham BEI, saham Amerika, dan aset kripto.</p></div></div><section class="card">${data.positions.length?`<div class="table-wrap"><table><thead><tr><th>ASET</th><th>PASAR</th><th>KUANTITAS</th><th>AVG COST</th><th>MARKET PRICE</th><th>VALUASI IDR</th><th>UNREALIZED P/L</th><th>TANGGAL NILAI</th></tr></thead><tbody>${data.positions.map(p=>{const val=Number(p.quantity)*Number(p.market_price)*Number(p.fx_to_idr),pl=(Number(p.market_price)-Number(p.average_cost))*Number(p.quantity)*Number(p.fx_to_idr);return `<tr><td><div class="symbol">${esc(p.symbol)}</div><div class="subsymbol">${esc(p.asset_name||'')}${isAdmin()&&p.investor_id?' · '+esc(data.investors.find(i=>i.id===p.investor_id)?.full_name||'Investor'):''}</div></td><td>${marketTag(p.market)}</td><td>${num(p.quantity)}</td><td>${num(p.average_cost)} ${esc(p.currency)}</td><td>${num(p.market_price)} ${esc(p.currency)}</td><td>${money(val)}</td><td class="${pl>=0?'positive':'negative'}">${money(pl)}</td><td>${dateFmt(p.valuation_date)}</td></tr>`}).join('')}</tbody></table></div>`:`<div class="table-empty">Belum ada posisi portofolio. ${isAdmin()?'Catat transaksi BUY pada menu Transaction Ledger. Posisi akan ditampilkan setelah dicatat melalui transaksi.':'Posisi investasi Anda akan tampil setelah transaksi BUY dicatat oleh admin.'}</div>`}</section><div class="notice" style="margin-top:14px">Nilai posisi dihitung dari kuantitas × harga pasar × kurs ke IDR. Harga dan kurs diinput atau diperbarui admin; feed harga bursa otomatis belum diaktifkan.</div>`;
+      return `<div class="page-head"><div><h2>Portfolio Positions</h2><p>Posisi dihitung otomatis dari seluruh riwayat transaksi BUY dan SELL.</p></div></div><section class="card">${data.positions.length?`<div class="table-wrap"><table><thead><tr><th>ASET</th><th>PASAR</th><th>KUANTITAS</th><th>AVG COST</th><th>MARKET PRICE</th><th>VALUASI IDR</th><th>UNREALIZED P/L</th><th>TANGGAL NILAI</th></tr></thead><tbody>${data.positions.map(p=>{const hasPrice=p.market_price!==null&&p.market_price!==undefined&&Number(p.market_price)>0,val=hasPrice?Number(p.quantity)*Number(p.market_price)*Number(p.fx_to_idr):null,pl=hasPrice?(Number(p.market_price)-Number(p.average_cost))*Number(p.quantity)*Number(p.fx_to_idr):null;return `<tr><td><div class="symbol">${esc(p.symbol)}</div><div class="subsymbol">${esc(p.asset_name||'')}${isAdmin()&&p.investor_id?' · '+esc(data.investors.find(i=>i.id===p.investor_id)?.full_name||'Investor'):''}</div></td><td>${marketTag(p.market)}</td><td>${num(p.quantity)}</td><td>${num(p.average_cost)} ${esc(p.currency)}</td><td>${hasPrice?num(p.market_price)+' '+esc(p.currency):'Belum diatur'}</td><td>${hasPrice?money(val):'—'}</td><td class="${pl===null?'':pl>=0?'positive':'negative'}">${pl===null?'—':money(pl)}</td><td>${p.valuation_date?dateFmt(p.valuation_date):'—'}</td></tr>`}).join('')}</tbody></table></div>`:`<div class="table-empty">Belum ada posisi aktif dari transaksi BUY/SELL. Catat transaksi BUY pada menu Transaction Ledger.</div>`}</section><div class="notice" style="margin-top:14px">Kuantitas dan average cost berasal otomatis dari ledger transaksi. Harga pasar dan kurs valuasi merupakan data terpisah; P/L dan nilai pasar baru ditampilkan setelah harga pasar tersedia. Penjualan mengurangi kuantitas, dan posisi yang sudah habis otomatis tidak ditampilkan.</div>`;
     }
     function transactionsPage(){return `<div class="page-head"><div><h2>Transaction Ledger</h2><p>Riwayat order dan biaya transaksi yang telah dicatat.</p></div>${isAdmin()?'<button class="btn" data-modal="transaction">＋ Catat Transaksi</button>':''}</div><section class="card">${transactionTable(data.transactions)}</section>`}
     function investorTable(){
@@ -310,7 +312,7 @@
       if(!confirm('Hapus setoran modal ini? Total modal dan perhitungan alokasi bagi hasil dapat berubah. Tindakan ini tidak dapat dibatalkan.'))return;
       try{const {error}=await supabase.from('investor_capital_movements').delete().eq('id',id).eq('movement_type','deposit');if(error)throw error;notify('Setoran modal berhasil dihapus.');await loadData();renderApp()}catch(e){notify(e.message||'Gagal menghapus setoran.',true)}
     }
-    async function recordSnapshot(){try{const value=data.positions.reduce((sum,p)=>sum+Number(p.quantity)*Number(p.market_price)*Number(p.fx_to_idr),0);const today=new Date().toISOString().slice(0,10);const {error}=await supabase.from('portfolio_snapshots').upsert({snapshot_date:today,portfolio_value_idr:value,cash_balance_idr:0,notes:'Snapshot dari nilai posisi saat ini',created_by:currentUser.id},{onConflict:'snapshot_date'});if(error)throw error;notify('Snapshot valuasi berhasil disimpan.');await loadData();renderApp()}catch(e){notify(e.message,true)}}
+    async function recordSnapshot(){try{const priced=(data.positions||[]).filter(p=>p.market_price!==null&&p.market_price!==undefined&&Number(p.market_price)>0);if(priced.length!==(data.positions||[]).length){notify('Snapshot tidak dibuat: masih ada posisi tanpa harga pasar.',true);return;}const value=priced.reduce((sum,p)=>sum+Number(p.quantity)*Number(p.market_price)*Number(p.fx_to_idr),0);const today=new Date().toISOString().slice(0,10);const {error}=await supabase.from('portfolio_snapshots').upsert({snapshot_date:today,portfolio_value_idr:value,cash_balance_idr:0,notes:'Snapshot dari nilai posisi saat ini',created_by:currentUser.id},{onConflict:'snapshot_date'});if(error)throw error;notify('Snapshot valuasi berhasil disimpan.');await loadData();renderApp()}catch(e){notify(e.message,true)}}
     async function toggleInvestorStatus(id,next){try{const {error}=await supabase.from('profiles').update({status:next}).eq('id',id);if(error)throw error;notify('Status investor diperbarui.');await loadData();renderApp()}catch(e){notify(e.message,true)}}
     async function updateDistributionStatus(id,next){try{const {error}=await supabase.from('profit_distributions').update({status:next}).eq('id',id);if(error)throw error;if(next==='paid'){const {error:e2}=await supabase.from('profit_allocations').update({payment_status:'paid',paid_at:new Date().toISOString()}).eq('distribution_id',id);if(e2)throw e2;}notify('Status distribusi diperbarui.');await loadData();renderApp()}catch(e){notify(e.message,true)}}
     async function downloadDocument(id){const doc=data.documents.find(d=>d.id===id);if(!doc)return;const {data:out,error}=await supabase.storage.from('investor-documents').createSignedUrl(doc.storage_path,60);if(error){notify(error.message,true);return;}window.open(out.signedUrl,'_blank','noopener,noreferrer')}
