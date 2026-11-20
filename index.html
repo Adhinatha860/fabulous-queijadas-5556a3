@@ -290,6 +290,24 @@
       modalRoot.innerHTML=`<div class="modal-backdrop"><div class="modal"><h3>${c.title}</h3><p>${c.desc}</p><form id="modal-form"><div class="form-grid">${c.body}</div><div class="modal-actions"><button type="button" class="btn ghost" id="cancel-modal">Batal</button><button type="submit" class="btn">Simpan</button></div></form></div></div>`;
       modalRoot.querySelector('#cancel-modal').onclick=()=>modalRoot.innerHTML='';
       modalRoot.querySelector('.modal-backdrop').addEventListener('click',e=>{if(e.target===e.currentTarget)modalRoot.innerHTML=''});
+      // Format angka saat diketik: titik untuk ribuan, koma untuk desimal.
+      modalRoot.querySelectorAll('input[type="number"]').forEach(input=>{
+        input.type='text';
+        input.inputMode='decimal';
+        input.dataset.numberFormat='id';
+        input.autocomplete='off';
+        const formatValue=raw=>{
+          const text=String(raw??'').replace(/[^0-9,.-]/g,'');
+          const negative=text.startsWith('-')?'-':'';
+          const unsigned=text.replace(/-/g,'');
+          const parts=unsigned.split(',');
+          const integer=(parts[0]||'').replace(/\./g,'');
+          const grouped=integer.replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+          return negative+grouped+(parts.length>1?','+parts.slice(1).join('').replace(/,/g,''):'');
+        };
+        input.value=formatValue(input.value);
+        input.addEventListener('input',()=>{const start=input.selectionStart;const before=input.value;const formatted=formatValue(before);input.value=formatted;const delta=formatted.length-before.length;try{input.setSelectionRange(Math.max(0,(start||0)+delta),Math.max(0,(start||0)+delta))}catch{}});
+      });
       if(type==='transaction'){
         const market=modalRoot.querySelector('[name="market"]'),currency=modalRoot.querySelector('[name="currency"]'),fx=modalRoot.querySelector('[name="fx_to_idr"]'),side=modalRoot.querySelector('[name="side"]'),realizedField=modalRoot.querySelector('#realized-pnl-field'),realizedInput=modalRoot.querySelector('[name="realized_pnl_idr"]');
         const currencyField=currency.closest('.field'),fxField=fx.closest('.field');
@@ -301,6 +319,12 @@
     }
     async function submitModal(e,type){
       e.preventDefault();const form=e.currentTarget,btn=form.querySelector('button[type=submit]');btn.disabled=true;const fd=new FormData(form),v=Object.fromEntries(fd.entries());
+      form.querySelectorAll('[data-number-format]').forEach(input=>{
+        const raw=String(input.value||'').trim();
+        const normalized=raw.replace(/\./g,'').replace(',', '.');
+        v[input.name]=normalized===''?0:Number(normalized);
+        if(!Number.isFinite(v[input.name]))throw new Error('Format angka pada '+(input.name||'kolom')+' tidak valid.');
+      });
       try{
         if(type==='market-price'){
           const p=data.positions[Number(v.position_index)];if(!p)throw new Error('Posisi tidak ditemukan.');
