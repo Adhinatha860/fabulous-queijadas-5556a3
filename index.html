@@ -132,9 +132,11 @@
       await loadData(); renderApp();
     }
     async function loadData(){
+      const transactionQuery=supabase.from('portfolio_transactions').select('*');
+      if(!isAdmin())transactionQuery.eq('investor_id',profile.id);
       const queries=[
         supabase.from('portfolio_positions_derived').select('*').order('market').order('symbol'),
-        supabase.from('portfolio_transactions').select('*').order('trade_date',{ascending:false}).limit(250),
+        transactionQuery.order('trade_date',{ascending:false}).limit(250),
         supabase.from('investor_capital_movements').select('*').order('movement_date',{ascending:false}).limit(250),
         supabase.from('profit_allocations').select('*').order('created_at',{ascending:false}).limit(100),
         supabase.from('investor_documents').select('*').order('created_at',{ascending:false}).limit(100),
