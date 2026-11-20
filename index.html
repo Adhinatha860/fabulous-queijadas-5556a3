@@ -216,9 +216,7 @@
     }
     function transactionsPage(){
       const rows=data.transactions||[];
-      const own=rows.filter(r=>r.investor_id===profile.id);
-      const shared=rows.filter(r=>!r.investor_id);
-      return `<div class="page-head"><div><h2>Transaction Ledger</h2><p>Riwayat order dan biaya transaksi yang telah dicatat.</p></div>${isAdmin()?'<button class="btn" data-modal="transaction">＋ Catat Transaksi</button>':''}</div>${isAdmin()?`<section class="card">${transactionTable(rows)}</section>`:`<section class="card"><div class="card-head"><div><h3>Transaksi Milik Saya</h3><div class="card-sub">Transaksi yang tercatat khusus atas nama akun Anda (${own.length} transaksi).</div></div></div>${transactionTable(own)}</section><section class="card" style="margin-top:15px"><div class="card-head"><div><h3>Transaksi Kepemilikan Bersama</h3><div class="card-sub">Transaksi portofolio bersama yang tidak diatribusikan ke investor tertentu (${shared.length} transaksi).</div></div></div>${transactionTable(shared)}</section>`}`;
+      return `<div class="page-head"><div><h2>Transaction Ledger</h2><p>Riwayat order dan biaya transaksi yang tercatat pada portofolio Anda.</p></div>${isAdmin()?'<button class="btn" data-modal="transaction">＋ Catat Transaksi</button>':''}</div>${isAdmin()?`<section class="card">${transactionTable(rows)}</section>`:`<section class="card"><div class="card-head"><div><h3>Transaksi Milik Saya</h3><div class="card-sub">${rows.length} transaksi tercatat pada portofolio Anda.</div></div></div>${transactionTable(rows)}</section>`}`;
     }
     function investorTable(){
       const rows=(data.investors||[]).filter(x=>x.role==='investor');if(!rows.length)return `<div class="table-empty">Belum ada investor terdaftar.</div>`;
