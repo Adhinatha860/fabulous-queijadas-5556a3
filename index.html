@@ -217,8 +217,8 @@
         supabase.from('investor_documents').select('*').order('created_at',{ascending:false}).limit(100),
         supabase.from('portfolio_snapshots').select('*').order('snapshot_date',{ascending:true}).limit(24),
         supabase.from('portfolio_dividends').select('*').order('payment_date',{ascending:false}).limit(250),
-        supabase.from('market_prices').select('*').order('fetched_at',{ascending:false}),
-        supabase.from('market_price_sync_runs').select('*').order('started_at',{ascending:false}).limit(10)
+        isAdmin()?supabase.from('market_prices').select('*').order('fetched_at',{ascending:false}):Promise.resolve({data:[],error:null}),
+        isAdmin()?supabase.from('market_price_sync_runs').select('*').order('started_at',{ascending:false}).limit(10):Promise.resolve({data:[],error:null})
       ];
       if(isAdmin())queries.push(supabase.from('profiles').select('*').order('created_at',{ascending:false}),supabase.from('profit_distributions').select('*').order('created_at',{ascending:false}).limit(100));
       else queries.push(Promise.resolve({data:[profile],error:null}),Promise.resolve({data:[],error:null}));
