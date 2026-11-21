@@ -266,6 +266,24 @@
       return `<div class="table-wrap"><table><thead><tr><th>TANGGAL</th><th>INVESTOR</th><th>INSTRUMEN</th><th>PASAR</th><th>AKSI</th><th>KUANTITAS</th><th>HARGA PEMBELIAN</th><th>NILAI TRANSAKSI</th><th>MARKET PRICE TERKINI</th><th>NILAI MARKET POSISI</th><th>BROKER FEE</th><th>REALIZED P/L</th>${isAdmin()?'<th>AKSI</th>':''}</tr></thead><tbody>${rows.map(r=>{const p=(data.positions||[]).find(x=>x.market===r.market&&String(x.symbol||'').toUpperCase()===String(r.symbol||'').toUpperCase()&&(x.investor_id||null)===(r.investor_id||null));const hasMarket=p&&p.market_price!==null&&p.market_price!==undefined&&Number(p.market_price)>0;const marketValue=hasMarket?Number(p.quantity)*Number(p.market_price)*Number(p.fx_to_idr):null;return `<tr><td>${dateFmt(r.trade_date)}</td><td>${(()=>{const inv=(data.investors||[]).find(i=>i.id===r.investor_id);return inv?`<div class="symbol">${esc(inv.full_name||"Investor")}</div><div class="subsymbol">${esc(inv.investor_code||"")}</div>`:`<div class="symbol">Portofolio Bersama</div><div class="subsymbol">Belum dialokasikan ke investor</div>`})()}</td><td><div class="symbol">${esc(r.symbol)}</div><div class="subsymbol">${esc(r.asset_name||'')}</div></td><td>${marketTag(r.market)}</td><td><span class="tag ${r.side==='BUY'?'buy':'sell'}">${r.side}</span></td><td>${num(r.quantity)}</td><td>${num(r.unit_price)} ${esc(r.currency||'')}</td><td>${money(Number(r.quantity)*Number(r.unit_price)*Number(r.fx_to_idr))}</td><td>${hasMarket?num(p.market_price)+' '+esc(p.currency||''):'Belum diatur'}</td><td>${marketValue===null?'—':money(marketValue)}</td><td>${money(r.broker_fee_idr)}</td><td class="${Number(r.realized_pnl_idr)>=0?'positive':'negative'}">${money(r.realized_pnl_idr)}</td>${isAdmin()?`<td><button class="btn ghost small-btn" data-transaction-edit="${r.id}">Edit</button> <button class="btn danger small-btn" data-transaction-delete="${r.id}">Hapus</button></td>`:''}</tr>`}).join('')}</tbody></table></div>`;
     }
     const marketTag=m=>`<span class="tag ${m==='IDX'?'idx':m==='US'?'us':'crypto'}">${m==='IDX'?'BEI':m==='US'?'US STOCK':'CRYPTO'}</span>`;
+    async function refreshMarketPrices(){
+      const button=document.querySelector('#refresh-market-prices');
+      if(button){button.disabled=true;button.textContent='Memperbarui...';}
+      try{
+        const {data:out,error}=await supabase.functions.invoke('aai-market-prices',{body:{action:'sync'}});
+        if(error)throw error;
+        if(out?.error)throw new Error(out.error);
+        await loadData();
+        renderApp();
+        notify(out?.message||'Harga saham berhasil disinkronkan.');
+        if(out?.errors?.length)notify(out.errors.map(x=>x.symbol+': '+x.error).join(' · '),true);
+      }catch(error){
+        notify(error instanceof Error?error.message:'Gagal memperbarui harga saham.',true);
+      }finally{
+        const current=document.querySelector('#refresh-market-prices');
+        if(current){current.disabled=false;current.textContent='↻ Sinkronkan Harga BEI';}
+      }
+    }
     function portfolioPage(){
       const source=data.positions||[];
       let rows=source.map((p,i)=>({...p,_firstIndex:i,_members:[p]}));
@@ -292,7 +310,7 @@
       const priced=prepared.filter(p=>p._hasPrice);
       const totalValue=priced.reduce((s,p)=>s+p._marketValue,0);
       const totalPl=priced.length===prepared.length?totalValue-totalInvested:null;
-      return `<div class="page-head"><div><h2>Portofolio</h2><p>${isAdmin()?'Ringkasan seluruh kepemilikan perusahaan.':'Ringkasan aset dari transaksi akun Anda.'}</p></div></div>
+      return `<div class="page-head"><div><h2>Portofolio</h2><p>${isAdmin()?'Ringkasan seluruh kepemilikan perusahaan.':'Ringkasan aset dari transaksi akun Anda.'}</p></div>${isAdmin()?'<button class="btn ghost small-btn" id="refresh-market-prices">↻ Sinkronkan Harga BEI</button>':''}</div>
         <div class="grid metrics portfolio-metrics">
           ${metric('Nilai Pasar',priced.length?money(totalValue):'—',priced.length+' dari '+prepared.length+' aset memiliki harga','◈')}
           ${metric('Total Diinvestasikan',money(totalInvested),'Akumulasi modal pada posisi aktif','↗')}
@@ -309,7 +327,7 @@
               <div><span>Diinvestasikan</span><strong>${money(p._invested)}</strong></div>
               <div><span>Unrealized P/L</span><strong class="${p._pl===null?'':p._pl>=0?'positive':'negative'}">${p._pl===null?'—':money(p._pl)}</strong></div>
             </div>
-            <div class="portfolio-item-foot"><span>Update harga: ${p.valuation_date?dateFmt(p.valuation_date):'Belum tersedia'}</span></div>
+            <div class="portfolio-item-foot"><span>Update harga: ${p.valuation_date?dateFmt(p.valuation_date):'Belum tersedia'}</span>${p.price_source?'<span>Sumber: '+esc(p.price_source)+(p.price_source==='Yahoo Finance'?' · data tertunda':'')+'</span>':''}${p.price_quote_timestamp?'<span>Waktu quote: '+new Date(p.price_quote_timestamp).toLocaleString('id-ID',{timeZone:'Asia/Jakarta',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})+' WIB</span>':''}</div>
           </section>`).join(''):'<section class="card table-empty">Belum ada posisi aktif. Catat transaksi BUY pada menu Transaksi.</section>'}
         </div>
         <div class="muted small portfolio-note">Avg Cost dihitung dari transaksi BUY tanpa broker fee. Unrealized P/L adalah nilai pasar dikurangi total investasi. Harga pasar diperbarui oleh admin.</div>`;
@@ -364,6 +382,7 @@
       root.querySelectorAll('[data-modal]').forEach(b=>b.addEventListener('click',()=>openModal(b.dataset.modal)));
       root.querySelectorAll('[data-investor-edit]').forEach(b=>b.addEventListener('click',()=>openModal('investor-edit',b.dataset.investorEdit)));
       root.querySelectorAll('[data-market-price]').forEach(b=>b.addEventListener('click',()=>openModal('market-price',b.dataset.marketPrice)));
+      root.querySelector('#refresh-market-prices')?.addEventListener('click',refreshMarketPrices);
       root.querySelectorAll('[data-capital]').forEach(b=>b.addEventListener('click',()=>openModal('capital',b.dataset.capital)));
       root.querySelectorAll('[data-capital-edit]').forEach(b=>b.addEventListener('click',()=>openModal('capital-edit',b.dataset.capitalEdit)));
       root.querySelectorAll('[data-capital-delete]').forEach(b=>b.addEventListener('click',()=>deleteCapitalMovement(b.dataset.capitalDelete)));
