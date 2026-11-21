@@ -85,6 +85,57 @@
     @media(max-width:520px){.metrics,.metrics[style]{grid-template-columns:1fr!important}.metric{min-height:0}}
     @media(max-width:390px){.metrics{grid-template-columns:1fr}.top-actions .status-pill{display:none}}
     @media print{body{background:white;color:#111}.sidebar,.top-actions,.toolbar,.btn,.nav-wrap{display:none!important}.app{display:block}.main{padding:0;max-width:none}.card,.metric{background:white;border:1px solid #ddd;box-shadow:none;color:#111;break-inside:avoid}.muted,.card-sub,.metric-foot{color:#555}.metric-value,td,th,.symbol{color:#111}.print-only{display:block}.table-wrap{overflow:visible}table{min-width:0}td,th{font-size:9px;padding:7px}}
+
+    /* Light theme */
+    html[data-theme="light"]{color-scheme:light;--bg:#f3f5f8;--panel:#ffffff;--panel2:#eef2f6;--panel3:#e6ebf1;--line:#d7dee8;--text:#202b3a;--muted:#68778b;--gold:#a77b3e;--gold2:#8b642e;--green:#168354;--red:#c34444;--blue:#397db6;--shadow:0 12px 32px rgba(30,45,65,.09)}
+    html[data-theme="light"] body{background:radial-gradient(ellipse at 75% -20%,#e5ebf2 0,transparent 42%),var(--bg);color:var(--text)}
+    html[data-theme="light"] .sidebar{background:rgba(255,255,255,.96);border-color:#dce3eb}
+    html[data-theme="light"] .side-brand{border-color:#e1e6ed}
+    html[data-theme="light"] .nav-label{color:#8995a5}
+    html[data-theme="light"] .nav button{color:#58677a}
+    html[data-theme="light"] .nav button:hover{background:#edf1f5;color:#202b3a}
+    html[data-theme="light"] .nav button.active{background:#f4ead9;border-color:#d9bd91;color:#5d421d}
+    html[data-theme="light"] .nav-icon{color:#9a7138}
+    html[data-theme="light"] .avatar{background:#eee5d7;color:#805b28}
+    html[data-theme="light"] .metric,html[data-theme="light"] .card{background:#fff;border-color:#dce3eb;box-shadow:0 5px 18px rgba(30,45,65,.05)}
+    html[data-theme="light"] .metric-top{color:#65758a}
+    html[data-theme="light"] .metric-icon{border-color:#eadcc5;background:#f7f0e5;color:#956c32}
+    html[data-theme="light"] .alloc-name,html[data-theme="light"] .alloc-val{color:#46566b}
+    html[data-theme="light"] .track{background:#e7ebf0}
+    html[data-theme="light"] .chart-grid{stroke:#dce3eb}
+    html[data-theme="light"] .chart-label{fill:#758399}
+    html[data-theme="light"] th{color:#718096;border-color:#e0e6ed}
+    html[data-theme="light"] td{color:#39485c;border-color:#e8edf2}
+    html[data-theme="light"] .symbol{color:#202b3a}
+    html[data-theme="light"] .subsymbol{color:#718096}
+    html[data-theme="light"] .tag.draft{background:#e8eff7;color:#496987}
+    html[data-theme="light"] .tag.idx{background:#f4ead9;color:#795522}
+    html[data-theme="light"] .tag.us{background:#e5f0fa;color:#376d9c}
+    html[data-theme="light"] .tag.crypto{background:#eee9fa;color:#66529a}
+    html[data-theme="light"] .toolbar input,html[data-theme="light"] .toolbar select{background:#fff;border-color:#d4dce6;color:#344256}
+    html[data-theme="light"] .field label{color:#536276}
+    html[data-theme="light"] .field input,html[data-theme="light"] .field select,html[data-theme="light"] .field textarea{background:#fff;border-color:#d4dce6;color:#263448}
+    html[data-theme="light"] .btn.secondary{background:#edf1f5;border-color:#d4dce6;color:#344256}
+    html[data-theme="light"] .btn.ghost{border-color:#d1dae5;color:#4b5b70}
+    html[data-theme="light"] .btn.danger{background:#fae9e9;border-color:#e8bfc2;color:#a8323b}
+    html[data-theme="light"] .notice{background:#edf3f8;border-color:#d4e0eb;color:#455b70}
+    html[data-theme="light"] .notice.warn{background:#fbf4e7;border-color:#ead8b3;color:#795d2d}
+    html[data-theme="light"] .notice.error{background:#fbecee;border-color:#efc7cd;color:#9d3541}
+    html[data-theme="light"] .auth-card{background:linear-gradient(155deg,#fff,#f3f6fa 70%);border-color:#dce3eb}
+    html[data-theme="light"] .auth-card p{color:#68778b}
+    html[data-theme="light"] .profile-card{background:#f1f5f9;border-color:#dce3eb}
+    html[data-theme="light"] .callout{background:#faf5eb;border-color:#e7d9bd;color:#735b32}
+    html[data-theme="light"] .modal{background:#fff;border-color:#d6dee8}
+    html[data-theme="light"] .modal-backdrop{background:#24324788}
+    html[data-theme="light"] .date-pill{color:#66758a;border-color:#d7dee8}
+    html[data-theme="light"] .menu-toggle{background:#f0f3f7;border-color:#d3dce6;color:#344256}
+    html[data-theme="light"] .portfolio-item-foot{border-color:#e5eaf0}
+    html[data-theme="light"] .status-pill{background:#e8f5ee;border-color:#c5e4d1;color:#26744d}
+    html[data-theme="light"] .table-empty{color:#718096}
+    html[data-theme="light"] .toast{background:#e8f5ee;border-color:#b8dfc8;color:#216b45}
+    html[data-theme="light"] .toast.error{background:#fbecee;border-color:#efc7cd;color:#9d3541}
+    .theme-toggle{min-width:38px;min-height:34px;padding:6px 10px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+    @media(max-width:760px){.theme-toggle{min-width:38px;width:auto}}
   </style>
 </head>
 <body>
@@ -290,11 +341,18 @@
     }
     function documentsPage(){return `<div class="page-head"><div><h2>Documents & Statements</h2><p>Laporan dan dokumen investasi yang disimpan secara privat.</p></div>${isAdmin()?'<button class="btn" data-modal="document">＋ Upload PDF</button>':''}</div><section class="card">${data.documents.length?`<div class="table-wrap"><table><thead><tr><th>DOKUMEN</th><th>INVESTOR</th><th>PERIODE</th><th>TIPE</th><th>TANGGAL</th><th>AKSI</th></tr></thead><tbody>${data.documents.map(d=>`<tr><td><div class="symbol">${esc(d.title)}</div><div class="subsymbol">PDF document</div></td><td>${esc(data.investors.find(i=>i.id===d.investor_id)?.full_name||'Me')}</td><td>${d.period_start?dateFmt(d.period_start)+' – '+dateFmt(d.period_end):'—'}</td><td>${esc(d.document_type)}</td><td>${dateFmt(d.created_at?.slice(0,10))}</td><td><button class="btn ghost small-btn" data-download="${d.id}">Unduh</button></td></tr>`).join('')}</tbody></table></div>`:`<div class="table-empty">Belum ada dokumen yang tersedia.</div>`}</section><div class="notice" style="margin-top:14px">Dokumen disimpan di bucket privat Supabase Storage. Tautan unduhan dibuat sementara setelah sesi login diverifikasi.</div>`}
     function profilePage(){return `<div class="page-head"><div><h2>My Account</h2><p>Informasi akun portal AAI Anda.</p></div></div><section class="card"><div class="profile-card"><div class="avatar">${initials(profile.full_name)}</div><div><div class="symbol">${esc(profile.full_name)}</div><div class="subsymbol">${esc(profile.email)}</div></div><span class="tag active" style="margin-left:auto">${esc(profile.role.toUpperCase())}</span></div><div class="grid two-col" style="margin-top:16px"><div><div class="muted small">Investor code</div><strong>${esc(profile.investor_code||'Belum ditetapkan')}</strong></div><div><div class="muted small">Status akun</div><strong>${esc(profile.status)}</strong></div><div><div class="muted small">Tanggal terdaftar</div><strong>${dateFmt(profile.created_at?.slice(0,10))}</strong></div><div><div class="muted small">Email</div><strong>${esc(profile.email)}</strong></div></div><div style="margin-top:18px"><button class="btn secondary" id="reset-password">Kirim tautan reset password</button></div></section>`}
+    function getTheme(){try{return localStorage.getItem('aai-theme')||'dark'}catch(e){return 'dark'}}
+    function applyTheme(theme){const chosen=theme==='light'?'light':'dark';document.documentElement.dataset.theme=chosen;try{localStorage.setItem('aai-theme',chosen)}catch(e){}}
+    applyTheme(getTheme());
     function renderApp(){
       const navItems=[['overview','◫','Overview'],['portfolio','◈','Portfolio'],['transactions','⇄','Transactions'],['dividends','＄','Dividends'],...(isAdmin()?[['investors','♙','Investors']]:[]),['distributions','％','Profit Sharing'],['documents','▤','Documents'],['profile','○','My Account']];
       if(!navItems.some(x=>x[0]===activePage))activePage='overview';
       const pageContent=({overview:overviewPage,portfolio:portfolioPage,transactions:transactionsPage,dividends:dividendsPage,investors:investorsPage,distributions:distributionPage,documents:documentsPage,profile:profilePage})[activePage]();
-      root.innerHTML=`<div class="app"><aside class="sidebar"><div class="side-brand"><div class="brand-mark">AAI</div><div><strong>ADHINATHA AMANAH</strong><span>PRIVATE INVESTMENT OFFICE</span></div></div><button type="button" class="menu-toggle" id="menu-toggle" aria-expanded="false" aria-controls="side-menu" aria-label="Buka menu navigasi"><span class="bars" aria-hidden="true"></span><span>Menu</span></button><div class="nav-wrap" id="side-menu"><div class="nav-label">WORKSPACE</div><nav class="nav">${navItems.map(([id,ico,label])=>`<button data-page="${id}" class="${activePage===id?'active':''}"><span class="nav-icon">${ico}</span>${label}</button>`).join('')}</nav></div><div class="side-bottom"><div class="user-chip"><div class="avatar">${initials(profile.full_name)}</div><div style="min-width:0"><strong>${esc(profile.full_name)}</strong><small>${isAdmin()?'Administrator':'Investor account'}</small></div></div><button class="btn ghost small-btn" style="width:100%" id="signout">Keluar dari portal</button></div></aside><main class="main"><header class="topbar"><div><div class="breadcrumb">AAI / ${titleMap[activePage]}</div><h1>${titleMap[activePage]}</h1></div><div class="top-actions">${!isAdmin()?'<button class="btn ghost small-btn" id="print-statement">Cetak ringkasan</button>':''}<span class="status-pill">● SECURE SESSION</span><span class="date-pill">${new Date().toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'})}</span></div></header><div id="page-content">${pageContent}</div></main></div>`;
+      root.innerHTML=`<div class="app"><aside class="sidebar"><div class="side-brand"><div class="brand-mark">AAI</div><div><strong>ADHINATHA AMANAH</strong><span>PRIVATE INVESTMENT OFFICE</span></div></div><button type="button" class="menu-toggle" id="menu-toggle" aria-expanded="false" aria-controls="side-menu" aria-label="Buka menu navigasi"><span class="bars" aria-hidden="true"></span><span>Menu</span></button><div class="nav-wrap" id="side-menu"><div class="nav-label">WORKSPACE</div><nav class="nav">${navItems.map(([id,ico,label])=>`<button data-page="${id}" class="${activePage===id?'active':''}"><span class="nav-icon">${ico}</span>${label}</button>`).join('')}</nav></div><div class="side-bottom"><div class="user-chip"><div class="avatar">${initials(profile.full_name)}</div><div style="min-width:0"><strong>${esc(profile.full_name)}</strong><small>${isAdmin()?'Administrator':'Investor account'}</small></div></div><button class="btn ghost small-btn" style="width:100%" id="signout">Keluar dari portal</button></div></aside><main class="main"><header class="topbar"><div><div class="breadcrumb">AAI / ${titleMap[activePage]}</div><h1>${titleMap[activePage]}</h1></div><div class="top-actions">${'<button type="button" class="btn ghost small-btn theme-toggle" id="theme-toggle" aria-label="Ganti ke mode terang" title="Ganti tema">☀️ <span>Terang</span></button>'}${!isAdmin()?'<button class="btn ghost small-btn" id="print-statement">Cetak ringkasan</button>':''}<span class="status-pill">● SECURE SESSION</span><span class="date-pill">${new Date().toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'})}</span></div></header><div id="page-content">${pageContent}</div></main></div>`;
+      const themeBtn=root.querySelector('#theme-toggle');
+      const syncThemeButton=()=>{const light=document.documentElement.dataset.theme==='light';themeBtn.innerHTML=light?'🌙 <span>Gelap</span>':'☀️ <span>Terang</span>';themeBtn.setAttribute('aria-label',light?'Ganti ke mode gelap':'Ganti ke mode terang');themeBtn.title=light?'Ganti ke mode gelap':'Ganti ke mode terang'};
+      syncThemeButton();
+      themeBtn.addEventListener('click',()=>{applyTheme(document.documentElement.dataset.theme==='light'?'dark':'light');syncThemeButton()});
       root.querySelectorAll('[data-page]').forEach(b=>b.addEventListener('click',()=>{activePage=b.dataset.page;renderApp()}));
       const sidebar=root.querySelector('.sidebar'),menuBtn=root.querySelector('#menu-toggle');
       const setMenu=open=>{sidebar.classList.toggle('menu-open',open);menuBtn.setAttribute('aria-expanded',String(open));menuBtn.setAttribute('aria-label',open?'Tutup menu navigasi':'Buka menu navigasi')};
