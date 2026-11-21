@@ -281,7 +281,7 @@
         notify(error instanceof Error?error.message:'Gagal memperbarui harga saham.',true);
       }finally{
         const current=document.querySelector('#refresh-market-prices');
-        if(current){current.disabled=false;current.textContent='↻ Sinkronkan Harga BEI';}
+        if(current){current.disabled=false;current.textContent='↻ Sinkronkan Harga Yahoo';}
       }
     }
     function portfolioPage(){
@@ -310,7 +310,7 @@
       const priced=prepared.filter(p=>p._hasPrice);
       const totalValue=priced.reduce((s,p)=>s+p._marketValue,0);
       const totalPl=priced.length===prepared.length?totalValue-totalInvested:null;
-      return `<div class="page-head"><div><h2>Portofolio</h2><p>${isAdmin()?'Ringkasan seluruh kepemilikan perusahaan.':'Ringkasan aset dari transaksi akun Anda.'}</p></div>${isAdmin()?'<button class="btn ghost small-btn" id="refresh-market-prices">↻ Sinkronkan Harga BEI</button>':''}</div>
+      return `<div class="page-head"><div><h2>Portofolio</h2><p>${isAdmin()?'Ringkasan seluruh kepemilikan perusahaan.':'Ringkasan aset dari transaksi akun Anda.'}</p></div>${isAdmin()?'<button class="btn ghost small-btn" id="refresh-market-prices">↻ Sinkronkan Harga Yahoo</button>':''}</div>
         <div class="grid metrics portfolio-metrics">
           ${metric('Nilai Pasar',priced.length?money(totalValue):'—',priced.length+' dari '+prepared.length+' aset memiliki harga','◈')}
           ${metric('Total Diinvestasikan',money(totalInvested),'Akumulasi modal pada posisi aktif','↗')}
