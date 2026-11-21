@@ -251,7 +251,7 @@
       return `<div class="alloc-list">${v.map(x=>{const amount=priced.filter(p=>p.market===x.key).reduce((s,p)=>s+Number(p.quantity)*Number(p.market_price)*Number(p.fx_to_idr),0),pct=amount/total*100;return `<div class="alloc-row"><div class="alloc-name"><span class="legend-dot" style="background:${x.color}"></span>${x.name}</div><div class="alloc-val">${pct.toFixed(1)}%</div><div class="track"><span style="width:${pct}%;background:${x.color}"></span></div></div>`}).join('')}</div>`;
     }
     function overviewPage(){
-      const t=totals(),admin=isAdmin(),dividends=(data.dividends||[]).reduce((s,d)=>s+Number(d.net_amount_idr||0),0),net=t.realized-t.fees+dividends;
+      const t=totals(),admin=isAdmin(),dividends=(data.dividends||[]).reduce((s,d)=>s+Number(d.net_amount_idr||0),0),realizedIncome=t.realized+dividends;
       const pending=(data.allocations||[]).filter(x=>x.payment_status!=='paid').reduce((s,x)=>s+Number(x.amount_idr||0),0),paid=(data.allocations||[]).filter(x=>x.payment_status==='paid').reduce((s,x)=>s+Number(x.amount_idr||0),0);
       const pct=t.invested>0?t.unrealized/t.invested*100:null,positions=data.positions||[],investors=(data.investors||[]).filter(x=>x.role==='investor');
       const markets=[{k:'IDX',n:'Saham Indonesia'},{k:'US',n:'Saham Amerika'},{k:'CRYPTO',n:'Aset Kripto'}].map(m=>{const ps=positions.filter(p=>p.market===m.k),v=ps.filter(p=>Number(p.market_price)>0).reduce((s,p)=>s+Number(p.quantity)*Number(p.market_price)*Number(p.fx_to_idr),0),pl=ps.filter(p=>Number(p.market_price)>0).reduce((s,p)=>s+(Number(p.market_price)-Number(p.average_cost))*Number(p.quantity)*Number(p.fx_to_idr),0);return {...m,ps,v,pl,pct:t.value>0?v/t.value*100:0}});
@@ -270,7 +270,7 @@
         metric('Invested Cost',t.invested?money(t.invested):'—','Nilai cost posisi yang masih dimiliki','↗'),
         metric('Net Capital',t.capital?money(t.capital):'—','Setoran dikurangi penarikan seluruh investor','◉'),
         metric('Unrealized P/L',t.pricedCount?money(t.unrealized):'—',pct===null?'Persentase belum tersedia':pctFmt(pct)+' dari invested cost','⌁',t.unrealized>=0?'positive':'negative'),
-        metric('Net Realized Income',net?money(net):'—','Realized '+money(t.realized)+' · biaya '+money(t.fees)+' · dividen net '+money(dividends),'◉',net>=0?'positive':'negative'),
+        metric('Realized P/L + Dividends',realizedIncome?money(realizedIncome):'—','Broker fee tercatat terpisah: '+money(t.fees),'◉',realizedIncome>=0?'positive':'negative'),
         metric('Active Investors',String(t.activeInvestors.length),positions.length+' posisi dalam pengelolaan','♙')
       ].join('');
       const marketHtml=markets.map(m=>'<tr><td><strong>'+m.n+'</strong><div class="subsymbol">'+m.ps.length+' posisi</div></td><td>'+(m.v?money(m.v):'—')+'</td><td>'+m.pct.toFixed(1)+'%</td><td class="'+(m.pl>=0?'positive':'negative')+'">'+money(m.pl)+'</td></tr>').join('');
