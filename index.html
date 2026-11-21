@@ -199,7 +199,7 @@
       const {data:p,error}=await supabase.from('profiles').select('*').eq('id',currentUser.id).maybeSingle();
       if(error)throw error;profile=p;
       if(!profile||profile.status!=='active') { await supabase.auth.signOut();currentUser=null;profile=null;authMode='login';renderAuth('Akun belum aktif. Hubungi admin PT. Adhinatha Amanah Investama untuk aktivasi.',true);return; }
-      await loadData(); renderApp();
+      await loadData(); renderApp(); startMarketPriceAutoRefresh();
     }
     async function loadData(){
       const transactionQuery=supabase.from('portfolio_transactions').select('*');
@@ -266,23 +266,31 @@
       return `<div class="table-wrap"><table><thead><tr><th>TANGGAL</th><th>INVESTOR</th><th>INSTRUMEN</th><th>PASAR</th><th>AKSI</th><th>KUANTITAS</th><th>HARGA PEMBELIAN</th><th>NILAI TRANSAKSI</th><th>MARKET PRICE TERKINI</th><th>NILAI MARKET POSISI</th><th>BROKER FEE</th><th>REALIZED P/L</th>${isAdmin()?'<th>AKSI</th>':''}</tr></thead><tbody>${rows.map(r=>{const p=(data.positions||[]).find(x=>x.market===r.market&&String(x.symbol||'').toUpperCase()===String(r.symbol||'').toUpperCase()&&(x.investor_id||null)===(r.investor_id||null));const hasMarket=p&&p.market_price!==null&&p.market_price!==undefined&&Number(p.market_price)>0;const marketValue=hasMarket?Number(p.quantity)*Number(p.market_price)*Number(p.fx_to_idr):null;return `<tr><td>${dateFmt(r.trade_date)}</td><td>${(()=>{const inv=(data.investors||[]).find(i=>i.id===r.investor_id);return inv?`<div class="symbol">${esc(inv.full_name||"Investor")}</div><div class="subsymbol">${esc(inv.investor_code||"")}</div>`:`<div class="symbol">Portofolio Bersama</div><div class="subsymbol">Belum dialokasikan ke investor</div>`})()}</td><td><div class="symbol">${esc(r.symbol)}</div><div class="subsymbol">${esc(r.asset_name||'')}</div></td><td>${marketTag(r.market)}</td><td><span class="tag ${r.side==='BUY'?'buy':'sell'}">${r.side}</span></td><td>${num(r.quantity)}</td><td>${num(r.unit_price)} ${esc(r.currency||'')}</td><td>${money(Number(r.quantity)*Number(r.unit_price)*Number(r.fx_to_idr))}</td><td>${hasMarket?num(p.market_price)+' '+esc(p.currency||''):'Belum diatur'}</td><td>${marketValue===null?'—':money(marketValue)}</td><td>${money(r.broker_fee_idr)}</td><td class="${Number(r.realized_pnl_idr)>=0?'positive':'negative'}">${money(r.realized_pnl_idr)}</td>${isAdmin()?`<td><button class="btn ghost small-btn" data-transaction-edit="${r.id}">Edit</button> <button class="btn danger small-btn" data-transaction-delete="${r.id}">Hapus</button></td>`:''}</tr>`}).join('')}</tbody></table></div>`;
     }
     const marketTag=m=>`<span class="tag ${m==='IDX'?'idx':m==='US'?'us':'crypto'}">${m==='IDX'?'BEI':m==='US'?'US STOCK':'CRYPTO'}</span>`;
-    async function refreshMarketPrices(){
-      const button=document.querySelector('#refresh-market-prices');
-      if(button){button.disabled=true;button.textContent='Memperbarui...';}
+    let marketPriceRefreshTimer=null, marketPriceRefreshBusy=false;
+    async function refreshMarketPrices(silent=true){
+      if(marketPriceRefreshBusy||!currentUser)return;
+      marketPriceRefreshBusy=true;
       try{
         const {data:out,error}=await supabase.functions.invoke('aai-market-prices',{body:{action:'sync'}});
         if(error)throw error;
         if(out?.error)throw new Error(out.error);
         await loadData();
         renderApp();
-        notify(out?.message||'Harga saham berhasil disinkronkan.');
-        if(out?.errors?.length)notify(out.errors.map(x=>x.symbol+': '+x.error).join(' · '),true);
+        if(!silent&&out?.message)notify(out.message);
+        if(!silent&&out?.errors?.length)notify(out.errors.map(x=>x.symbol+': '+x.error).join(' · '),true);
       }catch(error){
-        notify(error instanceof Error?error.message:'Gagal memperbarui harga saham.',true);
-      }finally{
-        const current=document.querySelector('#refresh-market-prices');
-        if(current){current.disabled=false;current.textContent='↻ Sinkronkan Harga Yahoo';}
-      }
+        if(!silent)notify(error instanceof Error?error.message:'Gagal memperbarui harga Yahoo Finance.',true);
+        console.error('AAI automatic market price sync:',error);
+      }finally{marketPriceRefreshBusy=false;}
+    }
+    function startMarketPriceAutoRefresh(){
+      if(marketPriceRefreshTimer)clearInterval(marketPriceRefreshTimer);
+      void refreshMarketPrices(true);
+      marketPriceRefreshTimer=setInterval(()=>void refreshMarketPrices(true),15*60*1000);
+    }
+    function stopMarketPriceAutoRefresh(){
+      if(marketPriceRefreshTimer)clearInterval(marketPriceRefreshTimer);
+      marketPriceRefreshTimer=null;
     }
     function portfolioPage(){
       const source=data.positions||[];
@@ -310,7 +318,7 @@
       const priced=prepared.filter(p=>p._hasPrice);
       const totalValue=priced.reduce((s,p)=>s+p._marketValue,0);
       const totalPl=priced.length===prepared.length?totalValue-totalInvested:null;
-      return `<div class="page-head"><div><h2>Portofolio</h2><p>${isAdmin()?'Ringkasan seluruh kepemilikan perusahaan.':'Ringkasan aset dari transaksi akun Anda.'}</p></div>${isAdmin()?'<button class="btn ghost small-btn" id="refresh-market-prices">↻ Sinkronkan Harga Yahoo</button>':''}</div>
+      return `<div class="page-head"><div><h2>Portofolio</h2><p>${isAdmin()?'Ringkasan seluruh kepemilikan perusahaan.':'Ringkasan aset dari transaksi akun Anda.'}</p></div></div>
         <div class="grid metrics portfolio-metrics">
           ${metric('Nilai Pasar',priced.length?money(totalValue):'—',priced.length+' dari '+prepared.length+' aset memiliki harga','◈')}
           ${metric('Total Diinvestasikan',money(totalInvested),'Akumulasi modal pada posisi aktif','↗')}
@@ -318,7 +326,7 @@
         </div>
         <div class="portfolio-list">
           ${prepared.length?prepared.map(p=>`<section class="card portfolio-item">
-            <div class="portfolio-item-head"><div><div class="portfolio-symbol">${esc(p.symbol)} <span>${marketTag(p.market)}</span></div><div class="subsymbol">${esc(p.asset_name||'')}${isAdmin()&&p._members.length>1?' · '+p._members.length+' kepemilikan digabung':''}</div></div>${isAdmin()?'<button class="btn ghost small-btn" data-market-price="'+p._firstIndex+'">'+(p._hasPrice?'Ubah Harga':'Atur Harga')+'</button>':''}</div>
+            <div class="portfolio-item-head"><div><div class="portfolio-symbol">${esc(p.symbol)} <span>${marketTag(p.market)}</span></div><div class="subsymbol">${esc(p.asset_name||'')}${isAdmin()&&p._members.length>1?' · '+p._members.length+' kepemilikan digabung':''}</div></div></div>
             <div class="portfolio-values">
               <div><span>Kuantitas</span><strong>${num(p.quantity)}</strong></div>
               <div><span>Avg Cost</span><strong>${num(p.average_cost)} ${esc(p.currency)}</strong></div>
@@ -330,7 +338,7 @@
             <div class="portfolio-item-foot"><span>Update harga: ${p.valuation_date?dateFmt(p.valuation_date):'Belum tersedia'}</span>${p.price_source?'<span>Sumber: '+esc(p.price_source)+(p.price_source==='Yahoo Finance'?' · data tertunda':'')+'</span>':''}${p.price_quote_timestamp?'<span>Waktu quote: '+new Date(p.price_quote_timestamp).toLocaleString('id-ID',{timeZone:'Asia/Jakarta',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})+' WIB</span>':''}</div>
           </section>`).join(''):'<section class="card table-empty">Belum ada posisi aktif. Catat transaksi BUY pada menu Transaksi.</section>'}
         </div>
-        <div class="muted small portfolio-note">Avg Cost dihitung dari transaksi BUY tanpa broker fee. Unrealized P/L adalah nilai pasar dikurangi total investasi. Harga pasar diperbarui oleh admin.</div>`;
+        <div class="muted small portfolio-note">Avg Cost dihitung dari transaksi BUY tanpa broker fee. Unrealized P/L adalah nilai pasar dikurangi total investasi. Harga pasar saham BEI, saham AS, dan kripto diperbarui otomatis dari Yahoo Finance. Data dapat tertunda; harga transaksi dan Avg Cost tidak berubah.</div>`;
     }
     function transactionsPage(){
       const rows=data.transactions||[];
@@ -381,8 +389,6 @@
       root.querySelector('#signout').addEventListener('click',async()=>{await supabase.auth.signOut();currentUser=null;profile=null;renderAuth()});
       root.querySelectorAll('[data-modal]').forEach(b=>b.addEventListener('click',()=>openModal(b.dataset.modal)));
       root.querySelectorAll('[data-investor-edit]').forEach(b=>b.addEventListener('click',()=>openModal('investor-edit',b.dataset.investorEdit)));
-      root.querySelectorAll('[data-market-price]').forEach(b=>b.addEventListener('click',()=>openModal('market-price',b.dataset.marketPrice)));
-      root.querySelector('#refresh-market-prices')?.addEventListener('click',refreshMarketPrices);
       root.querySelectorAll('[data-capital]').forEach(b=>b.addEventListener('click',()=>openModal('capital',b.dataset.capital)));
       root.querySelectorAll('[data-capital-edit]').forEach(b=>b.addEventListener('click',()=>openModal('capital-edit',b.dataset.capitalEdit)));
       root.querySelectorAll('[data-capital-delete]').forEach(b=>b.addEventListener('click',()=>deleteCapitalMovement(b.dataset.capitalDelete)));
@@ -400,7 +406,6 @@
 
         investor:{title:'Undang Investor Baru',desc:'Supabase Auth akan mengirim undangan aktivasi akun ke alamat email investor.',body:`<div class="field"><label>Nama lengkap</label><input name="full_name" required></div><div class="field"><label>Email investor</label><input name="email" type="email" required></div><div class="field"><label>Kode investor</label><input name="investor_code" placeholder="INV-001"></div>`},
         capital:{title:'Catat Pergerakan Modal',desc:'Catat setoran atau penarikan modal investor.',body:`<input type="hidden" name="investor_id" value="${id}"><div class="field"><label>Jenis pergerakan</label><select name="movement_type"><option value="deposit">Setoran modal</option><option value="withdrawal">Penarikan modal</option></select></div><div class="field"><label>Nominal (IDR)</label><input name="amount_idr" type="number" min="1" step="1" required></div><div class="field"><label>Tanggal</label><input name="movement_date" type="date" value="${new Date().toISOString().slice(0,10)}" required></div><div class="field"><label>Nomor referensi</label><input name="reference_no"></div><div class="field"><label>Catatan</label><input name="notes"></div>`},
-        'market-price':(index)=>{const p=data.positions[Number(index)];if(!p)throw new Error('Posisi tidak ditemukan.');return {title:'Perbarui Market Price',desc:'Masukkan harga pasar terakhir. Harga transaksi dan average cost tidak akan berubah.',body:`<input type="hidden" name="position_index" value="${Number(index)}"><div class="field"><label>Aset</label><input value="${esc(p.symbol+' · '+(p.asset_name||''))}" disabled></div><div class="field"><label>Market Price (${esc(p.currency)})</label><input name="market_price" type="number" min="0.00000001" step="any" value="${Number(p.market_price)>0?p.market_price:''}" required></div><div class="field" style="${p.market==='IDX'?'display:none':''}"><label>Kurs ke IDR</label><input name="fx_to_idr" type="number" min="0.000001" step="any" value="${p.fx_to_idr||1}" required></div><div class="field"><label>Tanggal harga</label><input name="valuation_date" type="date" value="${p.valuation_date||new Date().toISOString().slice(0,10)}" required></div>`};},
         position:{title:'Tambah / Perbarui Posisi',desc:'Nilai dan kurs diinput admin; input ulang simbol yang sama akan memperbarui posisi tersebut.',body:`<div class="field"><label>Investor (kosongkan untuk posisi pooled/admin)</label><select name="investor_id">${selectInvestor()}</select></div><div class="field"><label>Pasar</label><select name="market"><option value="IDX">Bursa Efek Indonesia</option><option value="US">Saham Amerika</option><option value="CRYPTO">Kripto</option></select></div><div class="field"><label>Symbol / pair</label><input name="symbol" required placeholder="BBCA / AAPL / BTCUSDT"></div><div class="field"><label>Nama aset</label><input name="asset_name"></div><div class="field"><label>Kuantitas</label><input name="quantity" type="number" min="0" step="any" required></div><div class="field"><label>Average cost</label><input name="average_cost" type="number" min="0" step="any" required></div><div class="field"><label>Harga pasar terakhir</label><input name="market_price" type="number" min="0" step="any" required></div><div class="field"><label>Mata uang</label><select name="currency"><option>IDR</option><option>USD</option><option>USDT</option></select></div><div class="field"><label>Kurs ke IDR</label><input name="fx_to_idr" type="number" min="0.000001" step="any" value="1" required></div><div class="field"><label>Tanggal valuasi</label><input name="valuation_date" type="date" value="${new Date().toISOString().slice(0,10)}"></div>`},
         'transaction-edit':(id)=>{const r=data.transactions.find(x=>x.id===id);if(!r||!isAdmin())throw new Error('Transaksi tidak ditemukan atau akses ditolak.');const invOptions=selectInvestor().replace('<option value="">Pilih investor</option>','<option value="">Portofolio Bersama / belum dialokasikan</option>').replace('value="'+(r.investor_id||'')+'"','value="'+(r.investor_id||'')+'" selected');return {title:'Edit Transaksi',desc:'Perubahan akan memengaruhi portofolio dan laporan terkait.',body:'<input type="hidden" name="transaction_id" value="'+esc(r.id)+'"><div class="field"><label>Investor pemilik transaksi</label><select name="investor_id">'+invOptions+'</select></div><div class="field"><label>Pasar</label><select name="market"><option value="IDX" '+(r.market==='IDX'?'selected':'')+'>BEI</option><option value="US" '+(r.market==='US'?'selected':'')+'>US Stocks</option><option value="CRYPTO" '+(r.market==='CRYPTO'?'selected':'')+'>Crypto</option></select></div><div class="field"><label>Symbol</label><input name="symbol" value="'+esc(r.symbol)+'" required></div><div class="field"><label>Nama aset</label><input name="asset_name" value="'+esc(r.asset_name||'')+'"></div><div class="field"><label>Side</label><select name="side"><option value="BUY" '+(r.side==='BUY'?'selected':'')+'>BUY</option><option value="SELL" '+(r.side==='SELL'?'selected':'')+'>SELL</option></select></div><div class="field"><label>Kuantitas</label><input name="quantity" type="number" min="0.00000001" step="any" value="'+r.quantity+'" required></div><div class="field"><label>Harga per unit</label><input name="unit_price" type="number" min="0" step="any" value="'+r.unit_price+'" required></div><div class="field"><label>Mata uang</label><select name="currency"><option '+((r.currency||'IDR')==='IDR'?'selected':'')+'>IDR</option><option '+(r.currency==='USD'?'selected':'')+'>USD</option><option '+(r.currency==='USDT'?'selected':'')+'>USDT</option></select></div><div class="field"><label>Kurs ke IDR</label><input name="fx_to_idr" type="number" min="0.000001" step="any" value="'+(r.fx_to_idr||1)+'" required></div><div class="field"><label>Broker fee (IDR)</label><input name="broker_fee_idr" type="number" min="0" step="any" value="'+(r.broker_fee_idr||0)+'"></div><div class="field" id="realized-pnl-field"><label>Realized P/L (IDR) — khusus SELL</label><input name="realized_pnl_idr" type="number" step="any" value="'+(r.realized_pnl_idr||0)+'"></div><div class="field"><label>Tanggal transaksi</label><input name="trade_date" type="date" value="'+esc(r.trade_date)+'" required></div><div class="field"><label>Catatan</label><input name="notes" value="'+esc(r.notes||'')+'"></div>'};},
         transaction:{title:'Catat Transaksi',desc:'Pilih investor pemilik transaksi agar pencatatan tiap investor terpisah. Transaksi tanpa investor akan dicatat sebagai portofolio bersama. Realized P/L tidak berlaku untuk BUY dan otomatis bernilai 0.',body:`<div class="field"><label>Investor pemilik transaksi</label><select name="investor_id">${selectInvestor().replace('<option value="">Pilih investor</option>','<option value="">Portofolio Bersama / belum dialokasikan</option>')}</select><div class="muted small">Pilih investor agar transaksi tercatat terpisah. Kosongkan hanya untuk transaksi portofolio bersama.</div></div><div class="field"><label>Pasar</label><select name="market"><option value="IDX">BEI</option><option value="US">US Stocks</option><option value="CRYPTO">Crypto</option></select></div><div class="field"><label>Symbol</label><input name="symbol" required placeholder="BBCA / AAPL / BTCUSDT"></div><div class="field"><label>Nama aset</label><input name="asset_name"></div><div class="field"><label>Side</label><select name="side"><option value="BUY">BUY</option><option value="SELL">SELL</option></select></div><div class="field"><label>Kuantitas</label><input name="quantity" type="number" min="0.00000001" step="any" required></div><div class="field"><label>Harga per unit</label><input name="unit_price" type="number" min="0" step="any" required></div><div class="field"><label>Mata uang</label><select name="currency"><option>IDR</option><option>USD</option><option>USDT</option></select></div><div class="field"><label>Kurs ke IDR</label><input name="fx_to_idr" type="number" min="0.000001" step="any" value="1" required></div><div class="field"><label>Broker fee (IDR)</label><input name="broker_fee_idr" type="number" min="0" step="any" value="0"></div><div class="field" id="realized-pnl-field"><label>Realized P/L (IDR) — khusus SELL</label><input name="realized_pnl_idr" type="number" step="any" value="0"></div><div class="field"><label>Tanggal transaksi</label><input name="trade_date" type="date" value="${new Date().toISOString().slice(0,10)}" required></div><div class="field"><label>Catatan</label><input name="notes"></div>`},
@@ -452,14 +457,7 @@
         if(!Number.isFinite(v[input.name]))throw new Error('Format angka pada '+(input.name||'kolom')+' tidak valid.');
       });
       try{
-        if(type==='market-price'){
-          const p=data.positions[Number(v.position_index)];if(!p)throw new Error('Posisi tidak ditemukan.');
-          const price=Number(v.market_price),fx=p.market==='IDX'?1:Number(v.fx_to_idr||p.fx_to_idr||1);if(!(price>0)||!(fx>0))throw new Error('Market price dan kurs harus lebih besar dari 0.');
-          const matching=(data.positions||[]).filter(x=>x.market===p.market&&String(x.symbol||'').trim().toUpperCase()===String(p.symbol||'').trim().toUpperCase()&&x.currency===p.currency);
-          const targets=isAdmin()?matching:[p];
-          const payloads=targets.map(x=>({investor_id:x.investor_id||null,market:x.market,symbol:String(x.symbol||'').trim().toUpperCase(),asset_name:x.asset_name||null,quantity:Number(x.quantity),average_cost:Number(x.average_cost),market_price:price,currency:x.currency,fx_to_idr:fx,valuation_date:v.valuation_date||new Date().toISOString().slice(0,10),created_by:currentUser.id,updated_at:new Date().toISOString()}));
-          const {error}=await supabase.from('portfolio_positions').upsert(payloads,{onConflict:'investor_id,market,symbol'});if(error)throw error;notify(isAdmin()?'Harga pasar saham berhasil diperbarui untuk seluruh kepemilikan.':'Market price berhasil diperbarui.');
-        }else if(type==='investor-edit'){
+        if(type==='investor-edit'){
           const fullName=String(v.full_name||'').trim(),investorCode=String(v.investor_code||'').trim();
           if(!fullName)throw new Error('Nama investor wajib diisi.');
           const {error}=await supabase.from('profiles').update({full_name:fullName,investor_code:investorCode||null}).eq('id',v.investor_id).eq('role','investor');if(error)throw error;notify('Data investor berhasil diperbarui.');
@@ -514,7 +512,7 @@
     async function toggleInvestorStatus(id,next){try{const {error}=await supabase.from('profiles').update({status:next}).eq('id',id);if(error)throw error;notify('Status investor diperbarui.');await loadData();renderApp()}catch(e){notify(e.message,true)}}
     async function updateDistributionStatus(id,next){try{const {error}=await supabase.from('profit_distributions').update({status:next}).eq('id',id);if(error)throw error;if(next==='paid'){const {error:e2}=await supabase.from('profit_allocations').update({payment_status:'paid',paid_at:new Date().toISOString()}).eq('distribution_id',id);if(e2)throw e2;}notify('Status distribusi diperbarui.');await loadData();renderApp()}catch(e){notify(e.message,true)}}
     async function downloadDocument(id){const doc=data.documents.find(d=>d.id===id);if(!doc)return;const {data:out,error}=await supabase.storage.from('investor-documents').createSignedUrl(doc.storage_path,60);if(error){notify(error.message,true);return;}window.open(out.signedUrl,'_blank','noopener,noreferrer')}
-    supabase.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_OUT'){currentUser=null;profile=null;if(authMode!=='login')authMode='login';renderAuth()}else if(event==='PASSWORD_RECOVERY'){authMode='update-password';currentUser=session?.user||null;renderAuth('Tautan reset berhasil diverifikasi. Silakan buat password baru.')}});
+    supabase.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_OUT'){stopMarketPriceAutoRefresh();currentUser=null;profile=null;if(authMode!=='login')authMode='login';renderAuth()}else if(event==='PASSWORD_RECOVERY'){authMode='update-password';currentUser=session?.user||null;renderAuth('Tautan reset berhasil diverifikasi. Silakan buat password baru.')}});
     const recoveryLink=new URLSearchParams(location.hash.replace(/^#/,'')).get('type')==='recovery';
     if(recoveryLink){authMode='update-password';renderAuth('Tautan reset terdeteksi. Silakan buat password baru.')}
     else{try{await refreshApp()}catch(e){renderAuth(e.message||'Aplikasi gagal terhubung ke Supabase.',true)}}
